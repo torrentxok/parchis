@@ -10,8 +10,6 @@ import (
 	"net/smtp"
 	"time"
 
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/torrentxok/parchis/pkg/cfg"
@@ -52,42 +50,12 @@ func InsertUser(regData RegistrationData) (*User, error) {
 	u.Password = _password
 	log.Print("[INFO] Password hash generated")
 
-	var DBerror pgtype.Int4
-	err = db.QueryRow(context.Background(),
-		`SELECT user_id, error_msg FROM dbo.insert_user(
-			username => $1,
-			email => $2,
-			password_hash => $3)`,
-		u.Username, u.Email, u.Password).Scan(&u.User_id, &DBerror)
+	err = insertUserToDB(db, &u)
 	if err != nil {
-		log.Print("[ERROR] Error insert user", err.Error())
 		return nil, err
-	}
-	log.Print(u.User_id, DBerror.Int, DBerror.Status)
-	if DBerror.Status == pgtype.Present && u.User_id == -1 {
-		switch DBerror.Int {
-		case 1:
-			return nil, errors.New("[ERROR] Пользователь уже существует")
-		default:
-			return nil, errors.New("[ERROR] Непредвиденная ошибка")
-		}
-	} else {
-		log.Print(u.User_id)
 	}
 
 	return &u, nil
-}
-
-// Подключение к БД
-func ConnectToDB() (*pgx.Conn, error) {
-	dbConnectionString := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", cfg.ConfigVar.Database.User,
-		cfg.ConfigVar.Database.Password, cfg.ConfigVar.Database.DBName)
-	db, err := pgx.Connect(context.Background(), dbConnectionString)
-	if err != nil {
-		log.Print("[ERROR] Error connection to DB: ", err)
-		return nil, err
-	}
-	return db, nil
 }
 
 // Генерация хеша пароля
@@ -113,40 +81,33 @@ func SendConfirmationEmail(u *User) error {
 		return err
 	}
 	log.Print("[INFO] Connected to DB")
-	var DBerror pgtype.Int4
-	err = db.QueryRow(context.Background(),
-		`SELECT * FROM dbo.insert_confirmation_token(
-			_user_id => $1,
-			_email => $2,
-			confirmation_token => $3)`,
-		u.User_id, u.Email, confirmationToken).Scan(&DBerror)
+
+	err = insertConfirmationTokenToDB(db, u, confirmationToken)
 	if err != nil {
-		log.Print("[ERROR] Error insert token" + err.Error())
 		return err
 	}
 
-	if DBerror.Status == pgtype.Present {
-		switch DBerror.Int {
-		case 1:
-			return errors.New("[ERROR] Пользователя нет в системе")
-		default:
-			return errors.New("[ERROR] Непредвиденная ошибка")
-		}
+	confirmationUrl := fmt.Sprintf("Для подтверждения почты перейдите по ссылке: localhost:8080/confirm_email?token=%s", confirmationToken)
+
+	err = SendEmail(u.Email, confirmationUrl)
+	if err != nil {
+		return err
 	}
+	return nil
+}
 
-	confirmationUrl := fmt.Sprintf("localhost:8080/confirm_email?token=%s", confirmationToken)
-
+func SendEmail(email string, text string) error {
 	auth := smtp.PlainAuth("", cfg.ConfigVar.SMTP.SenderEmail, cfg.ConfigVar.SMTP.SenderPasswd, "smtp.gmail.com")
-	to := []string{u.Email}
+	to := []string{email}
 
-	msg := []byte("To:" + u.Email + "\r\n" +
+	msg := []byte("To:" + email + "\r\n" +
 		"Subject: Parchis: Confirm Email\r\n" +
 		"\r\n" +
-		"Перейдите по ссылке для подтверждения почты: " + confirmationUrl + "\r\n")
+		text + "\r\n")
 
-	err = smtp.SendMail("smtp.gmail.com:25", auth, cfg.ConfigVar.SMTP.SenderEmail, to, msg)
+	err := smtp.SendMail("smtp.gmail.com:25", auth, cfg.ConfigVar.SMTP.SenderEmail, to, msg)
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
 	return nil
 }
@@ -181,23 +142,9 @@ func ConfirmEmail(token string) error {
 	}
 	log.Print("[INFO] Connected to DB")
 
-	var DBerror pgtype.Int4
-	err = db.QueryRow(context.Background(),
-		`SELECT * FROM dbo.confirm_email(
-			_confirmation_token => $1)`,
-		token).Scan(&DBerror)
+	err = confirmEmailInDB(db, token)
 	if err != nil {
-		log.Print("[ERROR] Error confirm email: " + err.Error())
 		return err
-	}
-
-	if DBerror.Status == pgtype.Present {
-		switch DBerror.Int {
-		case 1:
-			return errors.New("[ERROR] Пользователь не найден")
-		default:
-			return errors.New("[ERROR] Непредвиденная ошибка")
-		}
 	}
 
 	log.Print("[INFO] Email confirmed")

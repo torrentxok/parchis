@@ -14,79 +14,32 @@ func SignUpHandler(w http.ResponseWriter, r *http.Request) {
 	log.Print("[INFO] Start executing signup.")
 	err := json.NewDecoder(r.Body).Decode(&regData)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		errorResponse := ErrorResponse{
-			Error: struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			}{
-				Code:    http.StatusBadRequest,
-				Message: "Ошибка при декодировании JSON: " + err.Error(),
-			},
-		}
-		json.NewEncoder(w).Encode(errorResponse)
+		log.Print("Ошибка при декодировании JSON: " + err.Error())
+		SendJSONResponse(w, "Ошибка при декодировании JSON", http.StatusBadRequest)
 		return
 	}
 
 	err = ValidateRegData(regData)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		errorResponse := ErrorResponse{
-			Error: struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			}{
-				Code:    http.StatusBadRequest,
-				Message: err.Error(),
-			},
-		}
-		json.NewEncoder(w).Encode(errorResponse)
+		log.Print("[ERROR] Ошибка валидации пользователя: " + err.Error())
+		SendJSONResponse(w, "Ошибка данных", http.StatusBadRequest)
 		return
 	}
 
 	newUser, err := InsertUser(regData)
 	if err != nil {
 		log.Print("[ERROR] Ошибка создания пользователя: " + err.Error())
-		w.WriteHeader(http.StatusBadRequest)
-		errorResponse := ErrorResponse{
-			Error: struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			}{
-				Code:    http.StatusBadRequest,
-				Message: "Ошибка создания пользовтаеля",
-			},
-		}
-		json.NewEncoder(w).Encode(errorResponse)
+		SendJSONResponse(w, "Ошибка создания пользовтаеля", http.StatusBadRequest)
 		return
 	}
 
 	err = SendConfirmationEmail(newUser)
 	if err != nil {
 		log.Print("[ERROR] Ошибка отправки письма: " + err.Error())
-		w.WriteHeader(http.StatusBadRequest)
-		errorResponse := ErrorResponse{
-			Error: struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			}{
-				Code:    http.StatusBadRequest,
-				Message: "Ошибка создания пользовтаеля",
-			},
-		}
-		json.NewEncoder(w).Encode(errorResponse)
+		SendJSONResponse(w, "Ошибка создания пользовтаеля", http.StatusBadRequest)
 		return
 	}
-	errorResponse := ErrorResponse{
-		Error: struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		}{
-			Code:    http.StatusOK,
-			Message: "",
-		},
-	}
-	json.NewEncoder(w).Encode(errorResponse)
+	SendJSONResponse(w, "", http.StatusOK)
 }
 
 func ConfirmEmailHandler(w http.ResponseWriter, r *http.Request) {
@@ -99,35 +52,31 @@ func ConfirmEmailHandler(w http.ResponseWriter, r *http.Request) {
 	if token == "" {
 		log.Print("[ERROR] Token not detected")
 		http.Error(w, "Token not detected", http.StatusBadRequest)
+		return
 	}
 
 	err := ConfirmEmail(token)
 	if err != nil {
 		log.Print("[ERROR] Ошибка подтверждения: " + err.Error())
-		w.WriteHeader(http.StatusBadRequest)
-		errorResponse := ErrorResponse{
-			Error: struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			}{
-				Code:    http.StatusBadRequest,
-				Message: "Ошибка подтвержения",
-			},
-		}
-		json.NewEncoder(w).Encode(errorResponse)
+		SendJSONResponse(w, "Ошибка подтверждения", http.StatusBadRequest)
 		return
 	}
 
-	errorResponse := ErrorResponse{
+	SendJSONResponse(w, "", http.StatusOK)
+}
+
+func SendJSONResponse(w http.ResponseWriter, msg string, code int) {
+	w.WriteHeader(code)
+	JSONResponse := JSONResponse{
 		Error: struct {
 			Code    int    `json:"code"`
 			Message string `json:"message"`
 		}{
-			Code:    http.StatusOK,
-			Message: "",
+			Code:    code,
+			Message: msg,
 		},
 	}
-	json.NewEncoder(w).Encode(errorResponse)
+	json.NewEncoder(w).Encode(JSONResponse)
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {

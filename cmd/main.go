@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
-	_ "github.com/jackc/pgx/v5"
 
 	"github.com/torrentxok/parchis/pkg/auth"
 	"github.com/torrentxok/parchis/pkg/cfg"

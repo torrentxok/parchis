@@ -16,7 +16,7 @@ type RegistrationData struct {
 	Password string `json:"password"`
 }
 
-type ErrorResponse struct {
+type JSONResponse struct {
 	Error struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
