@@ -13,6 +13,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/torrentxok/parchis/pkg/cfg"
+	database "github.com/torrentxok/parchis/pkg/db"
 )
 
 // Валидация данных при регистрации
@@ -26,7 +27,7 @@ func ValidateRegData(regData RegistrationData) error {
 
 // Добавление пользователя в БД (подумать как сделать, в виде ХП)
 func InsertUser(regData RegistrationData) (*User, error) {
-	db, err := ConnectToDB()
+	db, err := database.ConnectToDB()
 	if err != nil {
 		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
 		return nil, err
@@ -75,12 +76,13 @@ func SendConfirmationEmail(u *User) error {
 		return err
 	}
 
-	db, err := ConnectToDB()
+	db, err := database.ConnectToDB()
 	if err != nil {
 		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
 		return err
 	}
 	log.Print("[INFO] Connected to DB")
+	defer db.Close(context.Background())
 
 	err = insertConfirmationTokenToDB(db, u, confirmationToken)
 	if err != nil {
@@ -135,12 +137,13 @@ func generateHashedToken(u *User) (string, error) {
 }
 
 func ConfirmEmail(token string) error {
-	db, err := ConnectToDB()
+	db, err := database.ConnectToDB()
 	if err != nil {
 		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
 		return err
 	}
 	log.Print("[INFO] Connected to DB")
+	defer db.Close(context.Background())
 
 	err = confirmEmailInDB(db, token)
 	if err != nil {
