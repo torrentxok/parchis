@@ -39,9 +39,10 @@ func main() {
 	log.Print("[INFO] Server start!")
 	r := mux.NewRouter()
 
-	r.HandleFunc("/signup", auth.SignUpHandler)
-	r.HandleFunc("/confirm_email", auth.ConfirmEmailHandler)
-	r.HandleFunc("/login", auth.Login)
+	//AUTH
+	r.HandleFunc("/signup", auth.SignUpHandler).Methods("POST")
+	r.HandleFunc("/confirm_email", auth.ConfirmEmailHandler).Methods("POST")
+	r.HandleFunc("/login", auth.LoginHandler).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":8080", r))
 }

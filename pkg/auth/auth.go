@@ -12,6 +12,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/dgrijalva/jwt-go"
+	"github.com/google/uuid"
 	"github.com/torrentxok/parchis/pkg/cfg"
 	database "github.com/torrentxok/parchis/pkg/db"
 )
@@ -25,6 +27,13 @@ func ValidateRegData(regData RegistrationData) error {
 	return nil
 }
 
+func ValidateLoginData(login LoginData) error {
+	if login.Email == "" || login.Password == "" {
+		return errors.New("почта и пароль обязательны")
+	}
+	return nil
+}
+
 // Добавление пользователя в БД (подумать как сделать, в виде ХП)
 func InsertUser(regData RegistrationData) (*User, error) {
 	db, err := database.ConnectToDB()
@@ -35,7 +44,7 @@ func InsertUser(regData RegistrationData) (*User, error) {
 	log.Print("[INFO] Connected to DB")
 	defer db.Close(context.Background())
 	u := User{
-		User_id:    -1,
+		UserId:     -1,
 		Username:   regData.Username,
 		Email:      regData.Email,
 		UserGroup:  "",
@@ -59,10 +68,83 @@ func InsertUser(regData RegistrationData) (*User, error) {
 	return &u, nil
 }
 
+func LoginUser(login *LoginData) (string, string, error) {
+	log.Print("[INFO] Start login user")
+	var u User
+	u.Email = login.Email
+	u.Password = login.Password
+
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
+		return "", "", err
+	}
+	err = getUserData(db, &u)
+	if err != nil {
+		log.Print("[ERROR] Ошибка поиска пользователя: " + err.Error())
+		return "", "", err
+	}
+
+	err = bcrypt.CompareHashAndPassword(u.PasswordHash, []byte(login.Password))
+	if err != nil {
+		log.Print("[ERROR] Неверный пароль: " + err.Error())
+		return "", "", err
+	}
+
+	session, err := CreateSession(&u)
+	if err != nil {
+		log.Print("[ERROR] Ошибка создания сессии: " + err.Error())
+		return "", "", err
+	}
+	return session.AccessToken, session.RefreshToken, nil
+}
+
+func CreateSession(u *User) (*UserSession, error) {
+	us := UserSession{
+		SessionId:    uuid.New(),
+		UserId:       u.UserId,
+		CreationDate: time.Now(),
+		UpdateDate:   time.Now(),
+		ExpiryTime:   time.Now().Add(24 * time.Hour),
+	}
+	var err error
+	us.AccessToken, err = GenerateToken(u, time.Minute*15)
+	if err != nil {
+		return nil, err
+	}
+	us.RefreshToken, err = GenerateToken(u, time.Hour*24)
+	if err != nil {
+		return nil, err
+	}
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
+		return nil, err
+	}
+	err = insertUserSession(db, &us)
+	if err != nil {
+		log.Print("[ERROR] Ошибка добавления сессии: " + err.Error())
+		return nil, err
+	}
+	return &us, nil
+}
+
+func GenerateToken(u *User, t time.Duration) (string, error) {
+	token := jwt.New(jwt.SigningMethodHS256)
+
+	claims := token.Claims.(jwt.MapClaims)
+	claims["UserId"] = u.UserId
+	claims["exp"] = time.Now().Add(t).Unix()
+	tokenString, err := token.SignedString(cfg.JWTKey)
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
+}
+
 // Генерация хеша пароля
 func HashPassword(password string) (string, error) {
-	hash := sha256.Sum256([]byte(password))
-	hashedPassword, err := bcrypt.GenerateFromPassword(hash[:], bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(hashedPassword), err
 }
 

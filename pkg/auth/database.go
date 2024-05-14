@@ -16,12 +16,12 @@ func insertUserToDB(db *pgx.Conn, u *User) error {
 			username => $1,
 			email => $2,
 			password_hash => $3)`,
-		u.Username, u.Email, u.Password).Scan(&u.User_id, &DBerror)
+		u.Username, u.Email, u.Password).Scan(&u.UserId, &DBerror)
 	if err != nil {
 		log.Print("[ERROR] Error insert user", err.Error())
 		return err
 	}
-	if DBerror.Status == pgtype.Present && u.User_id == -1 {
+	if DBerror.Status == pgtype.Present && u.UserId == -1 {
 		switch DBerror.Int {
 		case 1:
 			return errors.New("[ERROR] Пользователь уже существует")
@@ -42,7 +42,7 @@ func insertConfirmationTokenToDB(db *pgx.Conn, u *User, confirmationToken string
 			_user_id => $1,
 			_email => $2,
 			confirmation_token => $3)`,
-		u.User_id, u.Email, confirmationToken).Scan(&DBerror)
+		u.UserId, u.Email, confirmationToken).Scan(&DBerror)
 	if err != nil {
 		log.Print("[ERROR] Error insert token" + err.Error())
 		return err
@@ -76,6 +76,42 @@ func confirmEmailInDB(db *pgx.Conn, token string) error {
 		default:
 			return errors.New("[ERROR] Непредвиденная ошибка")
 		}
+	}
+	return nil
+}
+
+func getUserData(db *pgx.Conn, u *User) error {
+	err := db.QueryRow(context.Background(),
+		`SELECT * FROM dbo.search_user(
+			_email => $1)`,
+		u.Email).
+		Scan(&u.UserId, &u.Username, &u.Email, &u.UserGroup, &u.IsVerified, &u.Isdeleted, &u.PasswordHash)
+	if err != nil {
+		switch err {
+		case pgx.ErrNoRows:
+			return errors.New("[ERROR] Пользователь не найден")
+		default:
+			return err
+		}
+	}
+	return nil
+}
+
+func insertUserSession(db *pgx.Conn, us *UserSession) error {
+	var DBerror pgtype.Int4
+	err := db.QueryRow(context.Background(),
+		`SELECT * FROM dbo.insert_user_session(
+			_session_id => $1,
+			_user_id => $2,
+			_access_token => $3,
+			_refresh_token => $4,
+			_creation_date => $5,
+			_updated_date => $6,
+			_expiry_time => $7)`,
+		us.SessionId, us.UserId, us.AccessToken, us.RefreshToken, us.CreationDate, us.UpdateDate, us.ExpiryTime).
+		Scan(&DBerror)
+	if err != nil {
+		return err
 	}
 	return nil
 }

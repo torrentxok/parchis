@@ -79,7 +79,40 @@ func SendJSONResponse(w http.ResponseWriter, msg string, code int) {
 	json.NewEncoder(w).Encode(JSONResponse)
 }
 
-func Login(w http.ResponseWriter, r *http.Request) {
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
+	log.Print("[INFO] Start authentification")
+	var login LoginData
+	err := json.NewDecoder(r.Body).Decode(&login)
+	if err != nil {
+		log.Print("[ERROR] Ошибка запроса" + err.Error())
+		SendJSONResponse(w, "Ошибка запроса", http.StatusBadRequest)
+		return
+	}
+
+	err = ValidateLoginData(login)
+	if err != nil {
+		log.Print("[ERROR] Ошибка валидации" + err.Error())
+		SendJSONResponse(w, "Неверные данные", http.StatusBadRequest)
+		return
+	}
+
+	accessToken, refreshToken, err := LoginUser(&login)
+	if err != nil {
+		log.Print("[ERROR] Ошибка авторизации" + err.Error())
+		SendJSONResponse(w, "Ошибка авторизации", http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	var LoginResponse = struct {
+		AccessToken  string `json:"access"`
+		RefreshToken string `json:"refresh"`
+	}{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}
+	json.NewEncoder(w).Encode(LoginResponse)
+
 }

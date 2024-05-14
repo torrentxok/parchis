@@ -1,6 +1,7 @@
 package cfg
 
 var ConfigVar = Config{}
+var JWTKey = []byte("parchis")
 
 type Config struct {
 	Database struct {
