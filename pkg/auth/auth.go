@@ -91,6 +91,11 @@ func LoginUser(login *LoginData) (string, string, error) {
 		return "", "", err
 	}
 
+	if !u.IsVerified {
+		log.Print("[ERROR] Пользователь не подтвержден")
+		return "", "", errors.New("[ERROR] Пользователь не подтвержден")
+	}
+
 	session, err := CreateSession(&u)
 	if err != nil {
 		log.Print("[ERROR] Ошибка создания сессии: " + err.Error())
