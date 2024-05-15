@@ -11,6 +11,7 @@ import (
 
 	"github.com/torrentxok/parchis/pkg/auth"
 	"github.com/torrentxok/parchis/pkg/cfg"
+	"github.com/torrentxok/parchis/pkg/user"
 )
 
 func main() {
@@ -43,6 +44,9 @@ func main() {
 	r.HandleFunc("/signup", auth.SignUpHandler).Methods("POST")
 	r.HandleFunc("/confirm_email", auth.ConfirmEmailHandler).Methods("POST")
 	r.HandleFunc("/login", auth.LoginHandler).Methods("POST")
+
+	//USER
+	r.HandleFunc("/profile/{id}", user.GetUserProfileHandler).Methods("GET")
 
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
