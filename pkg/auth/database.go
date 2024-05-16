@@ -107,8 +107,9 @@ func insertUserSession(db *pgx.Conn, us *UserSession) error {
 			_refresh_token => $4,
 			_creation_date => $5,
 			_updated_date => $6,
-			_expiry_time => $7)`,
-		us.SessionId, us.UserId, us.AccessToken, us.RefreshToken, us.CreationDate, us.UpdateDate, us.ExpiryTime).
+			_access_token_expiry_time => $7,
+			_refresh_token_expiry_time => $8)`,
+		us.SessionId, us.UserId, us.AccessToken, us.RefreshToken, us.CreationDate, us.UpdateDate, us.AccessTokenExpiryTime, us.RefreshTokenExpiryTime).
 		Scan(&DBerror)
 	if err != nil {
 		return err

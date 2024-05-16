@@ -98,7 +98,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, refreshToken, err := LoginUser(&login)
+	loginResponse, err := LoginUser(&login)
 	if err != nil {
 		log.Print("[ERROR] Ошибка авторизации" + err.Error())
 		SendJSONResponse(w, "Ошибка авторизации", http.StatusBadRequest)
@@ -106,13 +106,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	var LoginResponse = struct {
-		AccessToken  string `json:"access"`
-		RefreshToken string `json:"refresh"`
-	}{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}
-	json.NewEncoder(w).Encode(LoginResponse)
+	json.NewEncoder(w).Encode(loginResponse)
 
 }

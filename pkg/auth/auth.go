@@ -68,7 +68,7 @@ func InsertUser(regData RegistrationData) (*User, error) {
 	return &u, nil
 }
 
-func LoginUser(login *LoginData) (string, string, error) {
+func LoginUser(login *LoginData) (*LoginResponse, error) {
 	log.Print("[INFO] Start login user")
 	var u User
 	u.Email = login.Email
@@ -77,31 +77,56 @@ func LoginUser(login *LoginData) (string, string, error) {
 	db, err := database.ConnectToDB()
 	if err != nil {
 		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
-		return "", "", err
+		return nil, err
 	}
 	err = getUserData(db, &u)
 	if err != nil {
 		log.Print("[ERROR] Ошибка поиска пользователя: " + err.Error())
-		return "", "", err
+		return nil, err
 	}
 
 	err = bcrypt.CompareHashAndPassword(u.PasswordHash, []byte(login.Password))
 	if err != nil {
 		log.Print("[ERROR] Неверный пароль: " + err.Error())
-		return "", "", err
+		return nil, err
 	}
 
 	if !u.IsVerified {
 		log.Print("[ERROR] Пользователь не подтвержден")
-		return "", "", errors.New("[ERROR] Пользователь не подтвержден")
+		return nil, errors.New("[ERROR] Пользователь не подтвержден")
 	}
 
 	session, err := CreateSession(&u)
 	if err != nil {
 		log.Print("[ERROR] Ошибка создания сессии: " + err.Error())
-		return "", "", err
+		return nil, err
 	}
-	return session.AccessToken, session.RefreshToken, nil
+	loginResponse := LoginResponse{
+		AccessToken: struct {
+			Token      string    `json:"token"`
+			ExpiryTime time.Time `json:"expiry_time"`
+		}{
+			Token:      session.AccessToken,
+			ExpiryTime: session.AccessTokenExpiryTime,
+		},
+		RefreshToken: struct {
+			Token      string    `json:"token"`
+			ExpiryTime time.Time `json:"expiry_time"`
+		}{
+			Token:      session.RefreshToken,
+			ExpiryTime: session.RefreshTokenExpiryTime,
+		},
+		User: struct {
+			Id       int    `json:"id"`
+			Username string `json:"username"`
+			Email    string `json:"email"`
+		}{
+			Id:       u.UserId,
+			Username: u.Username,
+			Email:    u.Email,
+		},
+	}
+	return &loginResponse, nil
 }
 
 func CreateSession(u *User) (*UserSession, error) {
@@ -110,14 +135,13 @@ func CreateSession(u *User) (*UserSession, error) {
 		UserId:       u.UserId,
 		CreationDate: time.Now(),
 		UpdateDate:   time.Now(),
-		ExpiryTime:   time.Now().Add(24 * time.Hour),
 	}
 	var err error
-	us.AccessToken, err = GenerateToken(u, time.Minute*15)
+	us.AccessToken, us.AccessTokenExpiryTime, err = GenerateToken(u, time.Minute*20)
 	if err != nil {
 		return nil, err
 	}
-	us.RefreshToken, err = GenerateToken(u, time.Hour*24)
+	us.RefreshToken, us.RefreshTokenExpiryTime, err = GenerateToken(u, time.Hour*24)
 	if err != nil {
 		return nil, err
 	}
@@ -134,17 +158,18 @@ func CreateSession(u *User) (*UserSession, error) {
 	return &us, nil
 }
 
-func GenerateToken(u *User, t time.Duration) (string, error) {
+func GenerateToken(u *User, t time.Duration) (string, time.Time, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 
 	claims := token.Claims.(jwt.MapClaims)
 	claims["UserId"] = u.UserId
-	claims["exp"] = time.Now().Add(t).Unix()
+	exp_time := time.Now().Add(t)
+	claims["exp"] = exp_time
 	tokenString, err := token.SignedString(cfg.JWTKey)
 	if err != nil {
-		return "", err
+		return "", time.Now(), err
 	}
-	return tokenString, nil
+	return tokenString, exp_time, nil
 }
 
 // Генерация хеша пароля
