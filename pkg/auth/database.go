@@ -116,3 +116,15 @@ func insertUserSession(db *pgx.Conn, us *UserSession) error {
 	}
 	return nil
 }
+
+func validateTokenInDB(db *pgx.Conn, token string) (bool, error) {
+	var ok bool
+	err := db.QueryRow(context.Background(),
+		`SELECT * FROM dbo.validate_access_token(
+			p_access_token => $1)`,
+		token).Scan(&ok)
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}

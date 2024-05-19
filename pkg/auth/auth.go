@@ -79,6 +79,7 @@ func LoginUser(login *LoginData) (*LoginResponse, error) {
 		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
 		return nil, err
 	}
+	defer db.Close(context.Background())
 	err = getUserData(db, &u)
 	if err != nil {
 		log.Print("[ERROR] Ошибка поиска пользователя: " + err.Error())
@@ -150,6 +151,7 @@ func CreateSession(u *User) (*UserSession, error) {
 		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
 		return nil, err
 	}
+	defer db.Close(context.Background())
 	err = insertUserSession(db, &us)
 	if err != nil {
 		log.Print("[ERROR] Ошибка добавления сессии: " + err.Error())
@@ -265,4 +267,35 @@ func ConfirmEmail(token string) error {
 	log.Print("[INFO] Email confirmed")
 
 	return nil
+}
+
+func ExtractClaims(tokenString string) (jwt.MapClaims, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return []byte(cfg.JWTKey), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return claims, nil
+	} else {
+		return nil, fmt.Errorf("invalid token")
+	}
+}
+
+func validateToken(token string) bool {
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
+		return false
+	}
+	defer db.Close(context.Background())
+	ok, err := validateTokenInDB(db, token)
+	if err != nil {
+		log.Print("[ERROR] Ошибка валидации токена: " + err.Error())
+		return false
+	}
+	return ok
 }

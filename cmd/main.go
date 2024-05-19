@@ -46,7 +46,8 @@ func main() {
 	r.HandleFunc("/login", auth.LoginHandler).Methods("POST")
 
 	//USER
-	r.HandleFunc("/profile/{id}", user.GetUserProfileHandler).Methods("GET")
+	r.Handle("/profile/{id}", auth.AuthMiddleware(http.HandlerFunc(user.GetUserProfileHandler))).Methods("GET")
+	r.Handle("/", auth.AuthMiddleware(http.HandlerFunc(user.AddFriendHandler))).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":8080", r))
 }

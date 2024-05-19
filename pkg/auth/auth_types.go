@@ -6,6 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type key int
+
+const (
+	ClaimsKey key = iota
+)
+
 type User struct {
 	UserId       int    `json:"user_id"`
 	Username     string `json:"username"`
@@ -53,11 +59,4 @@ type LoginResponse struct {
 		Username string `json:"username"`
 		Email    string `json:"email"`
 	} `json:"user"`
-}
-
-type JSONResponse struct {
-	Error struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
-	} `json:"error"`
 }
