@@ -14,3 +14,7 @@ type UserProfileResponse struct {
 		Username string `json:"username"`
 	} `json:"friends"`
 }
+
+type Friend struct {
+	TargetUserId int `json:"target_user_id"`
+}

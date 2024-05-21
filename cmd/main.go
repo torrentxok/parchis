@@ -47,7 +47,9 @@ func main() {
 
 	//USER
 	r.Handle("/profile/{id}", auth.AuthMiddleware(http.HandlerFunc(user.GetUserProfileHandler))).Methods("GET")
-	r.Handle("/", auth.AuthMiddleware(http.HandlerFunc(user.AddFriendHandler))).Methods("POST")
+	r.Handle("/friendships/request", auth.AuthMiddleware(http.HandlerFunc(user.FriendshipRequestHandler))).Methods("POST")
+	r.Handle("/friendships/accept", auth.AuthMiddleware(http.HandlerFunc(user.FriendshipAcceptHandler))).Methods("POST")
+	r.Handle("/friendships/remove", auth.AuthMiddleware(http.HandlerFunc(user.FriendshipRemoveHandler))).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":8080", r))
 }

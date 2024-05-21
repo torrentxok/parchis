@@ -102,31 +102,14 @@ func LoginUser(login *LoginData) (*LoginResponse, error) {
 		log.Print("[ERROR] Ошибка создания сессии: " + err.Error())
 		return nil, err
 	}
-	loginResponse := LoginResponse{
-		AccessToken: struct {
-			Token      string    `json:"token"`
-			ExpiryTime time.Time `json:"expiry_time"`
-		}{
-			Token:      session.AccessToken,
-			ExpiryTime: session.AccessTokenExpiryTime,
-		},
-		RefreshToken: struct {
-			Token      string    `json:"token"`
-			ExpiryTime time.Time `json:"expiry_time"`
-		}{
-			Token:      session.RefreshToken,
-			ExpiryTime: session.RefreshTokenExpiryTime,
-		},
-		User: struct {
-			Id       int    `json:"id"`
-			Username string `json:"username"`
-			Email    string `json:"email"`
-		}{
-			Id:       u.UserId,
-			Username: u.Username,
-			Email:    u.Email,
-		},
-	}
+	var loginResponse LoginResponse
+	loginResponse.AccessToken.Token = session.AccessToken
+	loginResponse.AccessToken.ExpiryTime = session.AccessTokenExpiryTime
+	loginResponse.RefreshToken.Token = session.RefreshToken
+	loginResponse.RefreshToken.ExpiryTime = session.RefreshTokenExpiryTime
+	loginResponse.User.Id = u.UserId
+	loginResponse.User.Username = u.Username
+	loginResponse.User.Email = u.Email
 	return &loginResponse, nil
 }
 

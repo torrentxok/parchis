@@ -101,6 +101,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			log.Print("[ERROR] Authorization header is required")
@@ -124,4 +126,22 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})
+}
+
+func AccessTokenHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	log.Print("[INFO] Start authentification")
+	var accessToken AccessTokenRequest
+	err := json.NewDecoder(r.Body).Decode(&accessToken)
+	if err != nil {
+		log.Print("[ERROR] Ошибка запроса" + err.Error())
+		api.SendErrorResponse(w, "Ошибка запроса", http.StatusBadRequest)
+		return
+	}
+	if accessToken.Token == "" || !validateToken(accessToken.Token) {
+		log.Print("[ERROR] Токен не прошел валидацию")
+		api.SendErrorResponse(w, "Invalid or missing token", http.StatusUnauthorized)
+		return
+	}
 }

@@ -2,8 +2,10 @@ package user
 
 import (
 	"context"
+	"errors"
 	"log"
 
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -53,4 +55,65 @@ func GetUserFriends(db *pgx.Conn, targetUserId int) ([]struct {
 	}
 
 	return friends, nil
+}
+
+func FriendshipsManaging(db *pgx.Conn, targetUserId int, currentUserId int, action string) error {
+	var DBerror pgtype.Int4
+	switch action {
+	case "request":
+		err := db.QueryRow(context.Background(),
+			`SELECT * FROM dbo.friendship_request(
+				target_user_id => $1,
+				current_user_id => $2)`,
+			targetUserId, currentUserId).Scan(&DBerror)
+		if err != nil {
+			return err
+		}
+		if DBerror.Status == pgtype.Present {
+			switch DBerror.Int {
+			case 1:
+				return errors.New("[ERROR] Одного или нескольких пользователей не существует")
+			default:
+				return errors.New("[ERROR] Непредвиденная ошибка")
+			}
+		}
+	case "accept":
+		err := db.QueryRow(context.Background(),
+			`SELECT * FROM dbo.friendship_accept(
+				target_user_id => $1,
+				current_user_id => $2)`,
+			targetUserId, currentUserId).Scan(&DBerror)
+		if err != nil {
+			return err
+		}
+		if DBerror.Status == pgtype.Present {
+			switch DBerror.Int {
+			case 1:
+				return errors.New("[ERROR] Записи не существует")
+			default:
+				return errors.New("[ERROR] Непредвиденная ошибка")
+			}
+		}
+	case "remove":
+		err := db.QueryRow(context.Background(),
+			`SELECT * FROM dbo.friendship_remove(
+				target_user_id => $1,
+				current_user_id => $2)`,
+			targetUserId, currentUserId).Scan(&DBerror)
+		if err != nil {
+			return err
+		}
+		if DBerror.Status == pgtype.Present {
+			switch DBerror.Int {
+			case 1:
+				return errors.New("[ERROR] Записи не существует")
+			default:
+				return errors.New("[ERROR] Непредвиденная ошибка")
+			}
+		}
+	default:
+		log.Print("[ERROR] Wrong action")
+		return errors.New("wrong action")
+	}
+	return nil
 }

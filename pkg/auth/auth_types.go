@@ -60,3 +60,27 @@ type LoginResponse struct {
 		Email    string `json:"email"`
 	} `json:"user"`
 }
+
+type AccessTokenRequest struct {
+	Token string `json:"access_token"`
+}
+
+type AccessTokenResponse struct {
+	Token      string    `json:"access_token"`
+	ExpiryTime time.Time `json:"expiry_time"`
+}
+
+type RefreshTokenRequest struct {
+	Token string `json:"refresh_token"`
+}
+
+type RefreshTokenResponse struct {
+	AccessToken struct {
+		Token      string    `json:"token"`
+		ExpiryTime time.Time `json:"expiry_time"`
+	} `json:"access_token"`
+	RefreshToken struct {
+		Token      string    `json:"token"`
+		ExpiryTime time.Time `json:"expiry_time"`
+	} `json:"refresh_token"`
+}
