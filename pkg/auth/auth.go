@@ -121,11 +121,11 @@ func CreateSession(u *User) (*UserSession, error) {
 		UpdateDate:   time.Now(),
 	}
 	var err error
-	us.AccessToken, us.AccessTokenExpiryTime, err = GenerateToken(u, time.Minute*20)
+	us.AccessToken, us.AccessTokenExpiryTime, err = GenerateToken(u.UserId, time.Minute*60)
 	if err != nil {
 		return nil, err
 	}
-	us.RefreshToken, us.RefreshTokenExpiryTime, err = GenerateToken(u, time.Hour*24)
+	us.RefreshToken, us.RefreshTokenExpiryTime, err = GenerateToken(u.UserId, time.Hour*24)
 	if err != nil {
 		return nil, err
 	}
@@ -143,11 +143,11 @@ func CreateSession(u *User) (*UserSession, error) {
 	return &us, nil
 }
 
-func GenerateToken(u *User, t time.Duration) (string, time.Time, error) {
+func GenerateToken(userId int, t time.Duration) (string, time.Time, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 
 	claims := token.Claims.(jwt.MapClaims)
-	claims["UserId"] = u.UserId
+	claims["UserId"] = userId
 	exp_time := time.Now().Add(t)
 	claims["exp"] = exp_time
 	tokenString, err := token.SignedString(cfg.JWTKey)
@@ -281,4 +281,89 @@ func validateToken(token string) bool {
 		return false
 	}
 	return ok
+}
+
+func AccessTokenUpdate(userId int, refreshToken string) (*AccessTokenResponse, error) {
+	// получаем данные сессии, затем запихиваем что получили в переменную, генерируем аксес токен и обновляем сессию
+	newUs := UserSession{
+		UserId:     userId,
+		UpdateDate: time.Now(),
+	}
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
+		return nil, err
+	}
+	defer db.Close(context.Background())
+
+	oldUs, err := getUserSession(db, userId, refreshToken)
+	if err != nil {
+		log.Print("[ERROR] Получения сессии: " + err.Error())
+		return nil, err
+	}
+
+	newUs.SessionId = oldUs.SessionId
+	newUs.RefreshToken = oldUs.RefreshToken
+	newUs.RefreshTokenExpiryTime = oldUs.RefreshTokenExpiryTime
+
+	newUs.AccessToken, newUs.AccessTokenExpiryTime, err = GenerateToken(userId, time.Minute*60)
+	if err != nil {
+		return nil, err
+	}
+
+	err = updateUserSession(db, &newUs)
+	if err != nil {
+		log.Print("[ERROR] Ошибка обновления сессии: " + err.Error())
+		return nil, err
+	}
+
+	atr := AccessTokenResponse{
+		Token:      newUs.AccessToken,
+		ExpiryTime: newUs.AccessTokenExpiryTime,
+	}
+	return &atr, nil
+}
+
+func RefreshTokenUpdate(userId int, refreshToken string) (*RefreshTokenResponse, error) {
+	newUs := UserSession{
+		UserId:     userId,
+		UpdateDate: time.Now(),
+	}
+	db, err := database.ConnectToDB()
+	if err != nil {
+		log.Print("[ERROR] Ошибка подключения к базе данных: " + err.Error())
+		return nil, err
+	}
+	defer db.Close(context.Background())
+
+	oldUs, err := getUserSession(db, userId, refreshToken)
+	if err != nil {
+		log.Print("[ERROR] Получения сессии: " + err.Error())
+		return nil, err
+	}
+
+	newUs.SessionId = oldUs.SessionId
+
+	newUs.AccessToken, newUs.AccessTokenExpiryTime, err = GenerateToken(newUs.UserId, time.Minute*60)
+	if err != nil {
+		return nil, err
+	}
+	newUs.RefreshToken, newUs.RefreshTokenExpiryTime, err = GenerateToken(newUs.UserId, time.Hour*24)
+	if err != nil {
+		return nil, err
+	}
+
+	err = updateUserSession(db, &newUs)
+	if err != nil {
+		log.Print("[ERROR] Ошибка обновления сессии: " + err.Error())
+		return nil, err
+	}
+
+	var rtr RefreshTokenResponse
+	rtr.AccessToken.Token = newUs.AccessToken
+	rtr.AccessToken.ExpiryTime = newUs.AccessTokenExpiryTime
+	rtr.RefreshToken.Token = newUs.RefreshToken
+	rtr.RefreshToken.ExpiryTime = newUs.RefreshTokenExpiryTime
+
+	return &rtr, nil
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/torrentxok/parchis/pkg/api"
 )
 
@@ -132,16 +133,63 @@ func AccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 	log.Print("[INFO] Start authentification")
-	var accessToken AccessTokenRequest
-	err := json.NewDecoder(r.Body).Decode(&accessToken)
+	var refreshToken AccessTokenRequest
+	err := json.NewDecoder(r.Body).Decode(&refreshToken)
 	if err != nil {
 		log.Print("[ERROR] Ошибка запроса" + err.Error())
 		api.SendErrorResponse(w, "Ошибка запроса", http.StatusBadRequest)
 		return
 	}
-	if accessToken.Token == "" || !validateToken(accessToken.Token) {
-		log.Print("[ERROR] Токен не прошел валидацию")
-		api.SendErrorResponse(w, "Invalid or missing token", http.StatusUnauthorized)
+	claims, ok := r.Context().Value(ClaimsKey).(jwt.MapClaims)
+	if !ok {
+		log.Print("[ERROR] No claims found")
+		api.SendErrorResponse(w, "No claims found", http.StatusInternalServerError)
 		return
 	}
+	userIdFloat64, ok := claims["UserId"].(float64)
+	if !ok {
+		log.Print("[ERROR] Invalid user ID in claims")
+		api.SendErrorResponse(w, "Invalid user ID in claims", http.StatusInternalServerError)
+		return
+	}
+	userId := int(userIdFloat64)
+	accessTokenResponse, err := AccessTokenUpdate(userId, refreshToken.Token)
+	if err != nil {
+		log.Print("[ERROR] Error update access token")
+		api.SendErrorResponse(w, "Error update access token", http.StatusInternalServerError)
+		return
+	}
+	api.SendSuccessResponse(w, accessTokenResponse)
+}
+
+func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+	var refreshToken RefreshTokenRequest
+	err := json.NewDecoder(r.Body).Decode(&refreshToken)
+	if err != nil {
+		log.Print("[ERROR] Ошибка запроса" + err.Error())
+		api.SendErrorResponse(w, "Ошибка запроса", http.StatusBadRequest)
+		return
+	}
+	claims, ok := r.Context().Value(ClaimsKey).(jwt.MapClaims)
+	if !ok {
+		log.Print("[ERROR] No claims found")
+		api.SendErrorResponse(w, "No claims found", http.StatusInternalServerError)
+		return
+	}
+	userIdFloat64, ok := claims["UserId"].(float64)
+	if !ok {
+		log.Print("[ERROR] Invalid user ID in claims")
+		api.SendErrorResponse(w, "Invalid user ID in claims", http.StatusInternalServerError)
+		return
+	}
+	userId := int(userIdFloat64)
+	refreshTokenResponse, err := RefreshTokenUpdate(userId, refreshToken.Token)
+	if err != nil {
+		log.Print("[ERROR] Error update refresh token")
+		api.SendErrorResponse(w, "Error update refresh token", http.StatusInternalServerError)
+		return
+	}
+	api.SendSuccessResponse(w, refreshTokenResponse)
 }

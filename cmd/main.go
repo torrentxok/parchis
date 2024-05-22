@@ -44,6 +44,8 @@ func main() {
 	r.HandleFunc("/signup", auth.SignUpHandler).Methods("POST")
 	r.HandleFunc("/confirm_email", auth.ConfirmEmailHandler).Methods("POST")
 	r.HandleFunc("/login", auth.LoginHandler).Methods("POST")
+	r.Handle("/token/newaccess", auth.AuthMiddleware(http.HandlerFunc(auth.AccessTokenHandler))).Methods("POST")
+	r.Handle("/token/newrefresh", auth.AuthMiddleware(http.HandlerFunc(auth.RefreshTokenHandler))).Methods("POST")
 
 	//USER
 	r.Handle("/profile/{id}", auth.AuthMiddleware(http.HandlerFunc(user.GetUserProfileHandler))).Methods("GET")

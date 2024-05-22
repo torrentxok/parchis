@@ -43,6 +43,7 @@ type UserSession struct {
 	RefreshTokenExpiryTime time.Time `json:"refresh_token_expiry_time"`
 	CreationDate           time.Time `json:"creation_date"`
 	UpdateDate             time.Time `json:"updated_date"`
+	EndDate                time.Time `json:"end_date"`
 }
 
 type LoginResponse struct {
@@ -62,7 +63,7 @@ type LoginResponse struct {
 }
 
 type AccessTokenRequest struct {
-	Token string `json:"access_token"`
+	Token string `json:"refresh_token"`
 }
 
 type AccessTokenResponse struct {

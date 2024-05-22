@@ -128,3 +128,42 @@ func validateTokenInDB(db *pgx.Conn, token string) (bool, error) {
 	}
 	return ok, nil
 }
+
+func getUserSession(db *pgx.Conn, userId int, refreshToken string) (UserSession, error) {
+	var us UserSession
+	var tempAccess []byte
+	var tempRefresh []byte
+	err := db.QueryRow(context.Background(),
+		`SELECT * FROM dbo.get_user_session(
+			p_user_id => $1,
+			p_refresh_token => $2)`,
+		userId, refreshToken).
+		Scan(&us.SessionId, &us.UserId, &tempAccess, &tempRefresh, &us.CreationDate,
+			&us.UpdateDate, &us.AccessTokenExpiryTime, &us.RefreshTokenExpiryTime, &us.EndDate)
+	if err != nil {
+		return us, err
+	}
+	us.AccessToken = string(tempAccess)
+	us.RefreshToken = string(tempRefresh)
+	return us, nil
+}
+
+func updateUserSession(db *pgx.Conn, us *UserSession) error {
+	var DBerror pgtype.Int4
+	err := db.QueryRow(context.Background(),
+		`SELECT * FROM dbo.update_user_session(
+			p_session_id => $1,
+			p_user_id => $2,
+			p_access_token => $3,
+			p_refresh_token => $4,
+			p_updated_date => $5,
+			p_access_token_expiry_time => $6,
+			p_refresh_token_expiry_time => $7)`,
+		us.SessionId, us.UserId, us.AccessToken, us.RefreshToken,
+		us.UpdateDate, us.AccessTokenExpiryTime, us.RefreshTokenExpiryTime).
+		Scan(&DBerror)
+	if err != nil {
+		return err
+	}
+	return nil
+}
