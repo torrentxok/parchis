@@ -115,3 +115,20 @@ func LeaveLobbyInDB(db *pgx.Conn, lobbyId int, userId int) error {
 	}
 	return nil
 }
+
+func StartGameInDB(db *pgx.Conn, lobbyId int, creatorId int) (int, error) {
+	var gameId pgtype.Int4
+	err := db.QueryRow(context.Background(),
+		`SELECT * FROM dbo.start_game(
+			p_lobby_id => $1,
+			p_creator_id => $2)`,
+		lobbyId, creatorId).
+		Scan(&gameId)
+	if err != nil {
+		return 0, err
+	}
+	if gameId.Status == pgtype.Null {
+		return 0, errors.New("ошибка создания игры")
+	}
+	return int(gameId.Int), nil
+}

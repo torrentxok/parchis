@@ -6,10 +6,27 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/torrentxok/parchis/pkg/api"
+	"github.com/torrentxok/parchis/pkg/auth"
 )
 
 func LobbiesHandler(w http.ResponseWriter, r *http.Request) {
+	claims, ok := r.Context().Value(auth.ClaimsKey).(jwt.MapClaims)
+	if !ok {
+		log.Print("[ERROR] No claims found")
+		api.SendErrorResponse(w, "No claims found", http.StatusInternalServerError)
+		return
+	}
+	userIdFloat64, ok := claims["UserId"].(float64)
+	if !ok {
+		log.Print("[ERROR] Invalid user ID in claims")
+		api.SendErrorResponse(w, "Invalid user ID in claims", http.StatusInternalServerError)
+		return
+	}
+	userId := int(userIdFloat64)
+
+	// начало ws соединения
 	conn, err := Upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("[ERROR] Ошибка подключения к websocket")
@@ -17,7 +34,7 @@ func LobbiesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := &Client{conn: conn}
+	client := &Client{conn: conn, UserId: userId}
 	mutex.Lock()
 	clients[client] = true
 	mutex.Unlock()
@@ -56,6 +73,11 @@ func LobbiesHandler(w http.ResponseWriter, r *http.Request) {
 			responseMsg, err = LeaveLobbyHandler(requestMsg.Data)
 			if err != nil {
 				log.Print("[ERROR] Ошибка выхода из лобби" + err.Error())
+			}
+		case "start_game":
+			responseMsg, err = StartGameHandler(requestMsg.Data, client.UserId)
+			if err != nil {
+				log.Print("[ERROR] Ошибка запуска игры" + err.Error())
 			}
 		default:
 			log.Print("[ERROR] Ошибка декодирования")
@@ -136,6 +158,7 @@ func CreateLobbyHandler(data json.RawMessage) (MessageResp, error) {
 	crResp.Code = http.StatusOK
 	crResp.Message = ""
 	crResp.Status = "success"
+	crResp.Type = "get_lobbies"
 	crResp.Data = lobbies
 
 	return crResp, nil
@@ -156,6 +179,7 @@ func GetLobbiesHandler() (MessageResp, error) {
 	glResp.Code = http.StatusOK
 	glResp.Message = ""
 	glResp.Status = "success"
+	glResp.Type = "get_lobbies"
 	glResp.Data = lobbies
 
 	return glResp, nil
@@ -197,6 +221,7 @@ func JoinLobbyHandler(data json.RawMessage) (MessageResp, error) {
 	jlResp.Code = http.StatusOK
 	jlResp.Message = ""
 	jlResp.Status = "success"
+	jlResp.Type = "get_lobbies"
 	jlResp.Data = lobbies
 	return jlResp, nil
 }
@@ -237,6 +262,39 @@ func LeaveLobbyHandler(data json.RawMessage) (MessageResp, error) {
 	llResp.Code = http.StatusOK
 	llResp.Message = ""
 	llResp.Status = "success"
+	llResp.Type = "get_lobbies"
 	llResp.Data = lobbies
 	return llResp, nil
+}
+
+func StartGameHandler(data json.RawMessage, userId int) (MessageResp, error) {
+	var sgReq StartGameReq
+	var sgResp MessageResp
+	err := json.Unmarshal([]byte(data), &sgReq)
+	if err != nil {
+		log.Print("[ERROR] Ошибка при разборе данных: " + err.Error())
+		sgResp.Code = http.StatusBadRequest
+		sgResp.Message = "Ошибка при разборе данных"
+		sgResp.Status = "error"
+		sgResp.Data = nil
+		return sgResp, errors.New("ошибка при разборе данных")
+	}
+	sgReq.CreatorId = userId
+	var game StartGameResp
+	game.LobbyId, err = StartGame(sgReq.LobbyId, sgReq.CreatorId)
+	if err != nil {
+		log.Print("[ERROR] Ошибка создания игры: " + err.Error())
+		sgResp.Code = http.StatusBadRequest
+		sgResp.Message = "Ошибка создания игры"
+		sgResp.Status = "error"
+		sgResp.Data = nil
+		return sgResp, errors.New("ошибка при разборе данных")
+	}
+
+	sgResp.Code = http.StatusOK
+	sgResp.Message = ""
+	sgResp.Status = "success"
+	sgResp.Type = "start_game"
+	sgResp.Data = game
+	return sgResp, nil
 }

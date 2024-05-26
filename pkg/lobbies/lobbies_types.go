@@ -13,27 +13,14 @@ var Upgrader = websocket.Upgrader{
 	WriteBufferSize: 8 * 1024, // 8 килобайта
 }
 
-var clients = make(map[*Client]bool)
-var mutex = &sync.Mutex{}
+var (
+	clients = make(map[*Client]bool)
+	mutex   = &sync.Mutex{}
+)
 
 type Client struct {
-	conn *websocket.Conn
-}
-
-type MessageReq struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `jaon:"data"`
-}
-
-type MessageResp struct {
-	Status  string      `json:"status"`
-	Message string      `json:"message"`
-	Code    int         `json:"code"`
-	Data    interface{} `json:"data"`
-}
-
-type CreateLobbyReq struct {
-	UserId int `json:"user_id"`
+	conn   *websocket.Conn
+	UserId int
 }
 
 type Player struct {
@@ -50,6 +37,23 @@ type Lobby struct {
 	Players      []Player  `json:"players"`
 }
 
+type MessageReq struct {
+	Type string          `json:"type"`
+	Data json.RawMessage `jaon:"data"`
+}
+
+type MessageResp struct {
+	Status  string      `json:"status"`
+	Message string      `json:"message"`
+	Code    int         `json:"code"`
+	Type    string      `json:"type"`
+	Data    interface{} `json:"data"`
+}
+
+type CreateLobbyReq struct {
+	UserId int `json:"user_id"`
+}
+
 type JoinLobbyReq struct {
 	LobbyId int `json:"lobby_id"`
 	UserId  int `json:"user_id"`
@@ -58,4 +62,13 @@ type JoinLobbyReq struct {
 type LeaveLobbyReq struct {
 	LobbyId int `json:"lobby_id"`
 	UserId  int `json:"user_id"`
+}
+
+type StartGameReq struct {
+	LobbyId   int `json:"lobby_id"`
+	CreatorId int `json:"creator_id"`
+}
+
+type StartGameResp struct {
+	LobbyId int `json:"lobby_id"`
 }
