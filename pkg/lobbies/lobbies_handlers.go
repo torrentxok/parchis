@@ -12,6 +12,8 @@ import (
 )
 
 func LobbiesHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
 	claims, ok := r.Context().Value(auth.ClaimsKey).(jwt.MapClaims)
 	if !ok {
 		log.Print("[ERROR] No claims found")
@@ -75,9 +77,17 @@ func LobbiesHandler(w http.ResponseWriter, r *http.Request) {
 				log.Print("[ERROR] Ошибка выхода из лобби" + err.Error())
 			}
 		case "start_game":
-			responseMsg, err = StartGameHandler(requestMsg.Data, client.UserId)
+			var startGameResp MessageResp
+			var players []int
+			startGameResp, players, err = StartGameHandler(requestMsg.Data, client.UserId)
 			if err != nil {
 				log.Print("[ERROR] Ошибка запуска игры" + err.Error())
+			} else {
+				BroadcastToSpecificUsers(players, startGameResp)
+				responseMsg, err = GetLobbiesHandler()
+				if err != nil {
+					log.Print("[ERROR] Ошибка получения лобби" + err.Error())
+				}
 			}
 		default:
 			log.Print("[ERROR] Ошибка декодирования")
@@ -119,6 +129,27 @@ func Broadcast(msg MessageResp) {
 			log.Print("[ERROR] Ошибка записи")
 			delete(clients, client)
 			client.conn.Close()
+		}
+	}
+}
+
+func BroadcastToSpecificUsers(userIds []int, msg MessageResp) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	userIdMap := make(map[int]bool)
+	for _, id := range userIds {
+		userIdMap[id] = true
+	}
+
+	for client := range clients {
+		if userIdMap[client.UserId] {
+			err := client.conn.WriteJSON(msg)
+			if err != nil {
+				log.Print("[ERROR] Ошибка записи")
+				delete(clients, client)
+				client.conn.Close()
+			}
 		}
 	}
 }
@@ -267,7 +298,7 @@ func LeaveLobbyHandler(data json.RawMessage) (MessageResp, error) {
 	return llResp, nil
 }
 
-func StartGameHandler(data json.RawMessage, userId int) (MessageResp, error) {
+func StartGameHandler(data json.RawMessage, userId int) (MessageResp, []int, error) {
 	var sgReq StartGameReq
 	var sgResp MessageResp
 	err := json.Unmarshal([]byte(data), &sgReq)
@@ -277,18 +308,19 @@ func StartGameHandler(data json.RawMessage, userId int) (MessageResp, error) {
 		sgResp.Message = "Ошибка при разборе данных"
 		sgResp.Status = "error"
 		sgResp.Data = nil
-		return sgResp, errors.New("ошибка при разборе данных")
+		return sgResp, nil, errors.New("ошибка при разборе данных")
 	}
 	sgReq.CreatorId = userId
 	var game StartGameResp
-	game.LobbyId, err = StartGame(sgReq.LobbyId, sgReq.CreatorId)
+	var players []int
+	game.LobbyId, players, err = StartGame(sgReq.LobbyId, sgReq.CreatorId)
 	if err != nil {
 		log.Print("[ERROR] Ошибка создания игры: " + err.Error())
 		sgResp.Code = http.StatusBadRequest
 		sgResp.Message = "Ошибка создания игры"
 		sgResp.Status = "error"
 		sgResp.Data = nil
-		return sgResp, errors.New("ошибка при разборе данных")
+		return sgResp, nil, errors.New("ошибка при разборе данных")
 	}
 
 	sgResp.Code = http.StatusOK
@@ -296,5 +328,5 @@ func StartGameHandler(data json.RawMessage, userId int) (MessageResp, error) {
 	sgResp.Status = "success"
 	sgResp.Type = "start_game"
 	sgResp.Data = game
-	return sgResp, nil
+	return sgResp, players, nil
 }

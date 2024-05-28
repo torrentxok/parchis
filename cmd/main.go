@@ -11,6 +11,7 @@ import (
 
 	"github.com/torrentxok/parchis/pkg/auth"
 	"github.com/torrentxok/parchis/pkg/cfg"
+	"github.com/torrentxok/parchis/pkg/game"
 	"github.com/torrentxok/parchis/pkg/lobbies"
 	"github.com/torrentxok/parchis/pkg/user"
 )
@@ -54,8 +55,11 @@ func main() {
 	r.Handle("/friendships/accept", auth.AuthMiddleware(http.HandlerFunc(user.FriendshipAcceptHandler))).Methods("POST")
 	r.Handle("/friendships/remove", auth.AuthMiddleware(http.HandlerFunc(user.FriendshipRemoveHandler))).Methods("POST")
 
-	//GAME
+	//Lobby
 	r.Handle("/games", auth.AuthMiddleware(http.HandlerFunc(lobbies.LobbiesHandler)))
+
+	//GAME
+	r.Handle("/game/{id}", auth.AuthMiddleware(http.HandlerFunc(game.GameHandler)))
 
 	log.Fatal(http.ListenAndServe(":8080", r))
 }

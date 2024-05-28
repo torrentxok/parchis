@@ -116,19 +116,33 @@ func LeaveLobbyInDB(db *pgx.Conn, lobbyId int, userId int) error {
 	return nil
 }
 
-func StartGameInDB(db *pgx.Conn, lobbyId int, creatorId int) (int, error) {
-	var gameId pgtype.Int4
+func StartGameInDB(db *pgx.Conn, lobbyId int, creatorId int) (int, []int, error) {
+	var gameId, player1Id, player2Id, player3Id, player4Id pgtype.Int4
 	err := db.QueryRow(context.Background(),
 		`SELECT * FROM dbo.start_game(
 			p_lobby_id => $1,
 			p_creator_id => $2)`,
 		lobbyId, creatorId).
-		Scan(&gameId)
+		Scan(&gameId, &player1Id, &player2Id, &player3Id, &player4Id)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if gameId.Status == pgtype.Null {
-		return 0, errors.New("ошибка создания игры")
+		return 0, nil, errors.New("ошибка создания игры")
 	}
-	return int(gameId.Int), nil
+
+	var playerIds []int
+	if player1Id.Status != pgtype.Null {
+		playerIds = append(playerIds, int(player1Id.Int))
+	}
+	if player2Id.Status != pgtype.Null {
+		playerIds = append(playerIds, int(player2Id.Int))
+	}
+	if player3Id.Status != pgtype.Null {
+		playerIds = append(playerIds, int(player3Id.Int))
+	}
+	if player4Id.Status != pgtype.Null {
+		playerIds = append(playerIds, int(player4Id.Int))
+	}
+	return int(gameId.Int), playerIds, nil
 }

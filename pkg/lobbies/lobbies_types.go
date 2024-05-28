@@ -8,14 +8,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var Upgrader = websocket.Upgrader{
-	ReadBufferSize:  8 * 1024, // 8 килобайта
-	WriteBufferSize: 8 * 1024, // 8 килобайта
-}
-
 var (
 	clients = make(map[*Client]bool)
-	mutex   = &sync.Mutex{}
+	// lobbyClients = make(map[int][]*Client)
+	mutex    = &sync.Mutex{}
+	Upgrader = websocket.Upgrader{
+		ReadBufferSize:  8 * 1024, // 8 килобайта
+		WriteBufferSize: 8 * 1024, // 8 килобайта
+	}
 )
 
 type Client struct {
